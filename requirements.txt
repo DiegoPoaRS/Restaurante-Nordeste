@@ -3,3 +3,7 @@ pydantic==2.13.5
 python_bcrypt==0.3.2
 python_jose==3.5.0
 SQLAlchemy==2.0.52
+uvicorn
+python-jose[cryptography]
+bcrypt
+requests
