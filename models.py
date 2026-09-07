@@ -16,7 +16,7 @@ class Usuario(Base):
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String, unique=True, index=True, nullable=False)
     senha_hash = Column(String, nullable=False)
-    tipo = Column(String, default="CLIENTE") 
+    tipo = Column(String, default="CLIENTE")
 
 class ItemCardapio(Base):
     __tablename__ = "itens_cardapio"
@@ -45,6 +45,6 @@ class Pedido(Base):
     id = Column(Integer, primary_key=True, index=True)
     cliente_id = Column(Integer, ForeignKey("usuarios.id"), nullable=False)
     canal_pedido = Column(Enum(CanalPedidoEnum), nullable=False)
-    status = Column(String, default="CRIADO") 
+    status = Column(String, default="CRIADO")
     valor_total = Column(Float, nullable=False)
     itens = relationship("ItemPedido", back_populates="pedido")

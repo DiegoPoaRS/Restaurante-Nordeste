@@ -1,9 +1,10 @@
+
 import bcrypt
 from jose import jwt
 from datetime import datetime, timedelta
 
 
-SECRET_KEY = "sua_chave_secreta_super_segura_aqui" # Em produção
+SECRET_KEY = "sua_chave_secreta_super_segura_aqui" 
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 

@@ -10,8 +10,7 @@ from models import Usuario, ItemCardapio, Pedido, CanalPedidoEnum, ItemPedido
 from fastapi.responses import JSONResponse
 from datetime import datetime, timezone
 from schemas import (
-    UsuarioCreate, UsuarioResponse, LoginRequest,
-    ItemCardapioResponse, PedidoCreate, PedidoResponse
+    UsuarioCreate, UsuarioResponse, LoginRequest, ItemCardapioResponse, PedidoCreate, PedidoResponse, ItemCardapioCreate, ItemCardapioUpdate
 )
 
 Base.metadata.create_all(bind=engine)
@@ -53,7 +52,6 @@ def get_usuario_atual(token: str = Depends(oauth2_scheme), db: Session = Depends
     )
     
     try:
-
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         email: str = payload.get("sub")
         if email is None:
@@ -66,6 +64,17 @@ def get_usuario_atual(token: str = Depends(oauth2_scheme), db: Session = Depends
         raise credenciais_exception
         
     return usuario
+
+def verificar_tipo_usuario(tipos_permitidos: list[str]):
+    def dependencia(usuario_atual: Usuario = Depends(get_usuario_atual)):
+        if usuario_atual.tipo not in tipos_permitidos:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Acesso negado: você não tem permissão para realizar esta operação."
+            )
+        return usuario_atual
+    return dependencia
+
 
 @app.post("/auth/registro", response_model=UsuarioResponse, status_code=status.HTTP_201_CREATED)
 def registrar_usuario(usuario: UsuarioCreate, db: Session = Depends(get_db)):
@@ -83,12 +92,12 @@ def registrar_usuario(usuario: UsuarioCreate, db: Session = Depends(get_db)):
 
 
 @app.post("/auth/login")
-
 def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     db_user = db.query(Usuario).filter(Usuario.email == form_data.username).first()
+    
     if not db_user or not verify_password(form_data.password, db_user.senha_hash):
         raise HTTPException(status_code=401, detail="Credenciais inválidas.")
-        
+
     access_token = create_access_token(data={"sub": db_user.email, "tipo": db_user.tipo})
     
     return {
@@ -102,7 +111,6 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
 def listar_cardapio(db: Session = Depends(get_db)):
     itens = db.query(ItemCardapio).filter(ItemCardapio.disponivel == 1).all()
     
-    # Se o cardapio tiver vazio insere itens de exemplo
     if not itens:
         item_exemplo = ItemCardapio(nome="X-Burger Especial", descricao="Pão, carne artesanal e queijo", preco=29.90, disponivel=1)
         db.add(item_exemplo)
@@ -112,14 +120,70 @@ def listar_cardapio(db: Session = Depends(get_db)):
     return itens
 
 class PagamentoMockRequest(BaseModel):
-    sucesso: bool = True
+    sucesso: bool = True 
 
+
+@app.post("/cardapio", response_model=ItemCardapioResponse, status_code=status.HTTP_201_CREATED)
+def criar_item_cardapio(
+    item_in: ItemCardapioCreate,
+    db: Session = Depends(get_db),
+    usuario_atual: Usuario = Depends(verificar_tipo_usuario(["ADMIN", "FUNCIONARIO"]))
+):
+
+    novo_item = ItemCardapio(**item_in.dict())
+    db.add(novo_item)
+    db.commit()
+    db.refresh(novo_item)
+    return novo_item
+
+@app.put("/cardapio/{item_id}", response_model=ItemCardapioResponse)
+def atualizar_item_cardapio(
+    item_id: int,
+    item_in: ItemCardapioUpdate,
+    db: Session = Depends(get_db),
+    usuario_atual: Usuario = Depends(verificar_tipo_usuario(["ADMIN", "FUNCIONARIO"]))
+):
+
+    item = db.query(ItemCardapio).filter(ItemCardapio.id == item_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Item do cardápio não encontrado.")
+    
+
+    dados_atualizacao = item_in.dict(exclude_unset=True)
+    for chave, valor in dados_atualizacao.items():
+        setattr(item, chave, valor)
+        
+    db.commit()
+    db.refresh(item)
+    return item
+
+@app.delete("/cardapio/{item_id}")
+def desativar_ou_deletar_item_cardapio(
+    item_id: int,
+    deletar_fisicamente: bool = False,
+    db: Session = Depends(get_db),
+    usuario_atual: Usuario = Depends(verificar_tipo_usuario(["ADMIN"]))
+):
+
+    item = db.query(ItemCardapio).filter(ItemCardapio.id == item_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Item do cardápio não encontrado.")
+    
+    if deletar_fisicamente:
+        db.delete(item)
+        db.commit()
+        return {"mensagem": f"Item {item_id} removido permanentemente do banco de dados."}
+    else:
+
+        item.disponivel = 0
+        db.commit()
+        return {"mensagem": f"Item {item_id} desativado com sucesso (disponível = 0).", "status_disponivel": item.disponivel}
 
 @app.post("/pedidos", response_model=PedidoResponse, status_code=status.HTTP_201_CREATED)
 def criar_pedido(
     pedido_in: PedidoCreate, 
     db: Session = Depends(get_db),
-    usuario_atual: Usuario = Depends(get_usuario_atual) # ROTA PROTEGIDA
+    usuario_atual: Usuario = Depends(get_usuario_atual) # ROTA PROTEGIDA!
 ):
     valor_total_pedido = 0
     itens_db = []
@@ -182,10 +246,10 @@ def listar_pedidos(
     canal_pedido: Optional[CanalPedidoEnum] = None,
     status: Optional[str] = None,
     db: Session = Depends(get_db),
-    usuario_atual: Usuario = Depends(get_usuario_atual) # ROTA PROTEGIDA
+    usuario_atual: Usuario = Depends(get_usuario_atual)
 ):
     query = db.query(Pedido)
-
+    
     if usuario_atual.tipo == "CLIENTE":
         query = query.filter(Pedido.cliente_id == usuario_atual.id)
     
@@ -195,3 +259,23 @@ def listar_pedidos(
         query = query.filter(Pedido.status == status)
         
     return query.all()
+
+class StatusUpdate(BaseModel):
+    novo_status: str 
+
+@app.patch("/pedidos/{pedido_id}/status", response_model=PedidoResponse)
+def atualizar_status_pedido(
+    pedido_id: int,
+    status_data: StatusUpdate,
+    db: Session = Depends(get_db),
+    usuario_func: Usuario = Depends(verificar_tipo_usuario(["FUNCIONARIO", "ADMIN"]))
+):
+    pedido = db.query(Pedido).filter(Pedido.id == pedido_id).first()
+    if not pedido:
+        raise HTTPException(status_code=404, detail="Pedido não encontrado.")
+    
+    pedido.status = status_data.novo_status
+    db.commit()
+    db.refresh(pedido)
+    
+    return pedido
