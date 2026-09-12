@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field, field_validator
 from typing import List, Optional
-from datetime import date
+from datetime import date, datetime
 from models import CanalPedidoEnum
 
 class UsuarioCreate(BaseModel):
@@ -38,7 +38,6 @@ class UsuarioResponse(BaseModel):
     class Config:
         from_attributes = True
 
-
 class LoginRequest(BaseModel):
     email: str
     senha: str
@@ -65,7 +64,6 @@ class ItemCardapioUpdate(BaseModel):
     preco: Optional[float] = None
     disponivel: Optional[int] = None
 
-# Esta classe precisa, obrigatoriamente, vir ANTES de PedidoCreate
 class ItemPedidoCreate(BaseModel):
     item_id: int
     quantidade: int
@@ -85,6 +83,24 @@ class ItemPedidoResponse(BaseModel):
     class Config:
         from_attributes = True
 
+
+class ItemCardapioSimples(BaseModel):
+    nome: str
+
+    class Config:
+        from_attributes = True
+
+
+class ItemPedidoDetalhadoResponse(BaseModel):
+    id: int
+    quantidade: int
+    preco_unitario: float
+    item_cardapio: ItemCardapioSimples
+
+    class Config:
+        from_attributes = True
+
+
 class PedidoResponse(BaseModel):
     id: int
     cliente_id: Optional[int] = None 
@@ -97,17 +113,29 @@ class PedidoResponse(BaseModel):
     class Config:
         from_attributes = True
 
-class ItemCardapioSimples(BaseModel):
-    nome: str
+class EstoqueResponse(BaseModel):
+    id: int
+    unidade_id: int
+    unidade_nome: Optional[str] = None
+    item_cardapio_id: int
+    quantidade: int
+    nome_item: Optional[str] = None
 
     class Config:
         from_attributes = True
 
-class ItemPedidoDetalhadoResponse(BaseModel):
-    id: int
+class EstoqueUpdate(BaseModel):
+    item_cardapio_id: int
     quantidade: int
-    preco_unitario: float
-    item_cardapio: ItemCardapioSimples
+    unidade_id: Optional[int] = None
+
+
+class LogAuditoriaResponse(BaseModel):
+    id: int
+    data_hora: datetime
+    usuario_id: Optional[int]
+    acao: str
+    detalhes: Optional[str]
 
     class Config:
         from_attributes = True

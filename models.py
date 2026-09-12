@@ -25,15 +25,14 @@ class Usuario(Base):
     nome_completo = Column(String, nullable=True)
     email = Column(String, unique=True, index=True, nullable=False)
     senha_hash = Column(String, nullable=False)
-    endereco_entrega = Column(String, nullable=True)
+    endereco_entrega = Column(String, nullable=False)
     telefone = Column(String, nullable=True)
-    cpf = Column(String, unique=True, nullable=True)
-    data_nascimento = Column(Date, nullable=True)
+    cpf = Column(String, unique=True, nullable=False)
+    data_nascimento = Column(Date, nullable=False)
     aceite_lgpd = Column(Boolean, default=False)
     tipo = Column(String, default="CLIENTE") 
     pontos_fidelidade = Column(Integer, default=0)
-    unidade_id = Column(Integer, ForeignKey("unidades.id"), nullable=True) # Vínculo Empregatício
-    
+    unidade_id = Column(Integer, ForeignKey("unidades.id"), nullable=True) # Vínculo com loja
     unidade = relationship("Unidade", back_populates="funcionarios")
 
 class LogAuditoria(Base):
@@ -79,7 +78,6 @@ class Pedido(Base):
     canal_pedido = Column(Enum(CanalPedidoEnum), nullable=False)
     status = Column(Enum(StatusPedidoEnum), default=StatusPedidoEnum.CRIADO)
     valor_total = Column(Float, nullable=False)
-    
     itens = relationship("ItemPedido", back_populates="pedido")
 
 class ItemPedido(Base):
@@ -89,6 +87,5 @@ class ItemPedido(Base):
     item_cardapio_id = Column(Integer, ForeignKey("itens_cardapio.id"), nullable=False)
     quantidade = Column(Integer, nullable=False)
     preco_unitario = Column(Float, nullable=False)
-    
     pedido = relationship("Pedido", back_populates="itens")
     item_cardapio = relationship("ItemCardapio")

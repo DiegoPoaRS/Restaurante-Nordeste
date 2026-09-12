@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from fastapi import Depends, HTTPException, Header
 
 # Configurações do JWT
-SECRET_KEY = "sua_chave_secreta_super_segura_aqui" # Em produção, use variáveis de ambiente (.env)
+SECRET_KEY = "sua_chave_secreta_super_segura_aqui" # Em produção, use .env
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
