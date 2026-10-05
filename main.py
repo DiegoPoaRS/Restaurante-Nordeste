@@ -5,13 +5,14 @@ from typing import Optional, List
 from fastapi import FastAPI, Depends, HTTPException, status, Request
 from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from sqlalchemy import func, desc
 from sqlalchemy.orm import Session
 from jose import JWTError, jwt
 from pydantic import BaseModel
 from database import engine, get_db, Base
 from security import SECRET_KEY, ALGORITHM, get_password_hash, verify_password, create_access_token, verificar_admin
 from models import Usuario, ItemCardapio, Pedido, CanalPedidoEnum, ItemPedido, Unidade, Estoque, StatusPedidoEnum, LogAuditoria
-from schemas import UsuarioCreate, UsuarioResponse, ItemCardapioResponse, PedidoCreate, PedidoResponse, ItemCardapioCreate, ItemCardapioUpdate, PromoverUsuario, LogAuditoriaResponse, EstoqueResponse, EstoqueUpdate
+from schemas import UsuarioCreate, UsuarioResponse, ItemCardapioResponse, PedidoCreate, PedidoResponse, ItemCardapioCreate, ItemCardapioUpdate, CampanhaCreate, PromoverUsuario, LogAuditoriaResponse, EstoqueResponse, EstoqueUpdate, UsuarioComPedidosResponse
 
 
 Base.metadata.create_all(bind=engine)
@@ -135,10 +136,24 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
     return {"access_token": access_token, "token_type": "bearer", "usuario_id": db_user.id, "tipo": db_user.tipo}
 
 
-@app.get("/usuarios/me", response_model=UsuarioResponse)
-def ler_usuario_atual(usuario_atual: Usuario = Depends(get_usuario_atual)):
-    """Retorna os dados do usuário logado, incluindo perfil e unidade vinculada."""
-    return usuario_atual
+@app.get("/usuarios/me", response_model=UsuarioComPedidosResponse)
+def ler_usuario_atual(
+    usuario_atual: Usuario = Depends(get_usuario_atual),
+    db: Session = Depends(get_db)):
+
+    pedidos_do_usuario = db.query(Pedido).filter(
+        Pedido.cliente_id == usuario_atual.id).order_by(Pedido.data_criacao.desc()).all()
+
+    return {
+        "id": usuario_atual.id,
+        "nome_completo": usuario_atual.nome_completo,
+        "email": usuario_atual.email,
+        "tipo": usuario_atual.tipo,
+        "pontos_fidelidade": usuario_atual.pontos_fidelidade,
+        "unidade_id": usuario_atual.unidade_id,
+        "cpf": usuario_atual.cpf,
+        "pedidos": pedidos_do_usuario
+    }
 
 
 @app.get("/usuarios/equipe", response_model=List[UsuarioResponse])
@@ -212,34 +227,6 @@ def listar_unidades(db: Session = Depends(get_db)):
 
 @app.get("/cardapio", response_model=List[ItemCardapioResponse])
 def listar_cardapio(db: Session = Depends(get_db)):
-
-#============================================
-# Cria a Unidade Matriz se não existir
-#============================================
-
-    unidade = db.query(Unidade).first()
-    if not unidade:
-        unidade = Unidade(nome="Matriz Raízes", endereco="Rua Principal, 100")
-        db.add(unidade)
-        db.commit()
-        db.refresh(unidade)
-
-#=================================
-# CRIA ADMIN CASO NÃO EXISTA
-#=================================
-
-    admin_existe = db.query(Usuario).filter(Usuario.email == "admin@raizes.com.br").first()
-    if not admin_existe:
-        admin = Usuario(
-            nome_completo="Admin", 
-            email="admin@raizes.com.br", 
-            senha_hash=get_password_hash("admin123"), 
-            tipo="ADMIN", 
-            unidade_id=""
-        )
-        db.add(admin)
-        db.commit()
-        
     return db.query(ItemCardapio).filter(ItemCardapio.disponivel == 1).all()
 
     
@@ -337,30 +324,20 @@ def criar_pedido(
 ):
     unidade = db.query(Unidade).filter(Unidade.id == pedido_in.unidade_id).first()
     if not unidade:
-        raise HTTPException(status_code=404, detail="A Unidade informada não existe.")
+        raise HTTPException(status_code=404, detail="Unidade não existe.")
 
-    cliente_final_id = None
+    cliente_final = None
     atendente_final_id = None
 
     if usuario_atual and usuario_atual.tipo in ["ADMIN", "GERENTE", "FUNCIONARIO"]:
         atendente_final_id = usuario_atual.id
-        
-        # === TRAVA DE SEGURANÇA POR UNIDADE ===
-        if usuario_atual.tipo in ["GERENTE", "FUNCIONARIO"]:
-            if pedido_in.unidade_id != usuario_atual.unidade_id:
-                raise HTTPException(
-                    status_code=403, 
-                    detail=f"Acesso negado: Você só pode registrar pedidos para a sua própria unidade."
-                )
-
         if pedido_in.cpf_cliente:
-            cliente_vinculado = db.query(Usuario).filter(Usuario.cpf == pedido_in.cpf_cliente).first()
-            if cliente_vinculado:
-                cliente_final_id = cliente_vinculado.id
+            cliente_final = db.query(Usuario).filter(Usuario.cpf == pedido_in.cpf_cliente).first()
     else:
-        cliente_final_id = usuario_atual.id if usuario_atual else None
+        cliente_final = usuario_atual
 
-    valor_total_pedido = 0
+    # 1. VALIDAÇÃO DE ESTOQUE E SUBTOTAL
+    subtotal_pedido = 0.0
     itens_db = []
     
     for item in pedido_in.itens:
@@ -372,19 +349,81 @@ def criar_pedido(
         if not estoque or estoque.quantidade < item.quantidade:
             raise HTTPException(status_code=409, detail=f"Estoque insuficiente para {produto.nome}.")
             
-        valor_total_pedido += produto.preco * item.quantidade
+        subtotal_pedido += produto.preco * item.quantidade
         itens_db.append(ItemPedido(item_cardapio_id=produto.id, quantidade=item.quantidade, preco_unitario=produto.preco))
+
+    # 2. CÁLCULO DE DESCONTOS (PONTOS OU CUPOM)
+    valor_desconto = 0.0
+    pontos_utilizados = 0
+    cupom_aplicado_nome = None
+    
+    if pedido_in.usar_pontos_fidelidade:
+        if not cliente_final:
+            raise HTTPException(status_code=400, detail="Identificação necessária para usar pontos.")
         
+        # 100 pontos = R$ 1.00
+        valor_em_pontos = cliente_final.pontos_fidelidade / 100.0
+        if valor_em_pontos > 0:
+            # Não deixa o desconto ser maior que o subtotal do pedido
+            valor_desconto = min(subtotal_pedido, valor_em_pontos)
+            pontos_utilizados = int(valor_desconto * 100)
+            cliente_final.pontos_fidelidade -= pontos_utilizados # Deduz os pontos do cliente real
+
+    elif pedido_in.codigo_cupom:
+        from models import Campanha # Importe se necessário
+        cupom = db.query(Campanha).filter(
+            Campanha.codigo == pedido_in.codigo_cupom,
+            Campanha.ativo == True
+        ).first()
+        
+        if not cupom:
+            raise HTTPException(status_code=404, detail="Cupom inválido ou expirado.")
+            
+        if cupom.unidade_id and cupom.unidade_id != unidade.id:
+            raise HTTPException(status_code=400, detail="Este cupom não é válido para esta loja.")
+            
+        cupom_aplicado_nome = cupom.codigo
+        
+        # Aplica o desconto item a item dependendo da regra
+        for item_pedido in itens_db:
+            produto_vinculado = db.query(ItemCardapio).filter(ItemCardapio.id == item_pedido.item_cardapio_id).first()
+            aplica_desconto = False
+            
+            if cupom.tipo_aplicacao == "CATEGORIA" and produto_vinculado.categoria == cupom.categoria_alvo:
+                aplica_desconto = True
+            elif cupom.tipo_aplicacao == "ITEM" and produto_vinculado.id == cupom.item_alvo_id:
+                aplica_desconto = True
+                
+            if aplica_desconto:
+                valor_item_cheio = item_pedido.preco_unitario * item_pedido.quantidade
+                desconto_neste_item = valor_item_cheio * (cupom.desconto_percentual / 100.0)
+                valor_desconto += desconto_neste_item
+
+    valor_total_final = subtotal_pedido - valor_desconto
+    if valor_total_final < 0: valor_total_final = 0.0
+
+    # 3. PERSISTÊNCIA DO PEDIDO
     novo_pedido = Pedido(
-        cliente_id=cliente_final_id,
+        cliente_id=cliente_final.id if cliente_final else None,
         atendente_id=atendente_final_id,
         unidade_id=unidade.id,
         canal_pedido=pedido_in.canal_pedido,
-        valor_total=valor_total_pedido,
+        subtotal=subtotal_pedido,
+        valor_desconto=valor_desconto,
+        valor_total=valor_total_final,
+        pontos_resgatados=pontos_utilizados,
+        cupom_aplicado=cupom_aplicado_nome,
         status=StatusPedidoEnum.CRIADO
     )
     novo_pedido.itens = itens_db
     db.add(novo_pedido)
+    db.flush() 
+
+    # LOG GERENCIAL
+    qtd_itens = sum([i.quantidade for i in pedido_in.itens])
+    detalhes_venda = f"NOVA_VENDA | Pedido: #{novo_pedido.id} | Subtotal: R$ {subtotal_pedido:.2f} | Desconto: R$ {valor_desconto:.2f} | Final: R$ {valor_total_final:.2f} | Atendente: {atendente_final_id}"
+    registrar_auditoria(db=db, usuario_id=usuario_atual.id if usuario_atual else None, acao="PEDIDO_CRIADO", detalhes=detalhes_venda)
+
     db.commit()
     db.refresh(novo_pedido)
     return novo_pedido
@@ -523,3 +562,132 @@ def atualizar_status_pedido(
     db.refresh(pedido)
     
     return pedido
+
+
+@app.get("/relatorios/bi")
+def gerar_relatorios_bi(
+    db: Session = Depends(get_db),
+    usuario_atual: Usuario = Depends(verificar_tipo_usuario(["ADMIN", "GERENTE"]))
+):
+    """Gera indicadores gerenciais. Filtra automaticamente pela unidade se for Gerente."""
+    
+    # 1. Query Base (Ignora cancelados)
+    query_base = db.query(Pedido).filter(Pedido.status != StatusPedidoEnum.CANCELADO)
+    if usuario_atual.tipo == "GERENTE":
+        query_base = query_base.filter(Pedido.unidade_id == usuario_atual.unidade_id)
+        
+    # Faturamento e Ticket Médio
+    dados_gerais = query_base.with_entities(
+        func.count(Pedido.id).label("total_pedidos"),
+        func.sum(Pedido.valor_total).label("faturamento_total"),
+        func.avg(Pedido.valor_total).label("ticket_medio")
+    ).first()
+
+    # 2. SLA de Pedidos (Tempo médio em minutos)
+    query_sla = db.query(
+        func.avg((func.julianday(Pedido.data_atualizacao) - func.julianday(Pedido.data_criacao)) * 1440)
+    ).filter(Pedido.status.in_([StatusPedidoEnum.PRONTO, StatusPedidoEnum.ENTREGUE]))
+    
+    if usuario_atual.tipo == "GERENTE":
+        query_sla = query_sla.filter(Pedido.unidade_id == usuario_atual.unidade_id)
+        
+    sla_medio = query_sla.scalar()
+
+    # 3. Itens Mais Vendidos
+    query_itens = db.query(
+        ItemCardapio.nome,
+        func.sum(ItemPedido.quantidade).label("total_vendido")
+    ).join(ItemPedido, ItemCardapio.id == ItemPedido.item_cardapio_id)\
+     .join(Pedido, ItemPedido.pedido_id == Pedido.id)\
+     .filter(Pedido.status != StatusPedidoEnum.CANCELADO)
+     
+    if usuario_atual.tipo == "GERENTE":
+        query_itens = query_itens.filter(Pedido.unidade_id == usuario_atual.unidade_id)
+        
+    itens_vendidos = query_itens.group_by(ItemCardapio.nome).order_by(desc("total_vendido")).limit(5).all()
+
+    # 4. Venda por Funcionário (Ticket / Desempenho)
+    query_func = db.query(
+        Usuario.nome_completo,
+        func.count(Pedido.id).label("total_pedidos"),
+        func.sum(Pedido.valor_total).label("total_arrecadado")
+    ).join(Pedido, Usuario.id == Pedido.atendente_id)\
+     .filter(Pedido.status != StatusPedidoEnum.CANCELADO)
+     
+    if usuario_atual.tipo == "GERENTE":
+        query_func = query_func.filter(Pedido.unidade_id == usuario_atual.unidade_id)
+        
+    vendas_funcionarios = query_func.group_by(Usuario.nome_completo).order_by(desc("total_arrecadado")).all()
+
+    return {
+        "faturamento_total": dados_gerais.faturamento_total or 0.0,
+        "total_pedidos": dados_gerais.total_pedidos or 0,
+        "ticket_medio": dados_gerais.ticket_medio or 0.0,
+        "sla_medio_minutos": round(sla_medio, 2) if sla_medio else 0.0,
+        "top_itens": [{"nome": i[0], "quantidade": i[1]} for i in itens_vendidos],
+        "vendas_por_funcionario": [{"nome": f[0], "pedidos": f[1], "arrecadado": f[2]} for f in vendas_funcionarios]
+    }
+
+
+
+@app.post("/campanhas", status_code=status.HTTP_201_CREATED)
+def criar_campanha(
+    campanha_in: CampanhaCreate,
+    db: Session = Depends(get_db),
+    usuario_atual: Usuario = Depends(verificar_tipo_usuario(["ADMIN", "GERENTE"]))
+):
+    from models import Campanha # Importação local para evitar dependência circular
+    
+    # === REGRA DE NEGÓCIO: HIERARQUIA ===
+    if usuario_atual.tipo == "GERENTE":
+        # Força o cupom a pertencer APENAS à loja do gerente, ignorando o que vier no payload
+        campanha_in.unidade_id = usuario_atual.unidade_id
+    
+    # Validações estruturais do cupom
+    if campanha_in.tipo_aplicacao == "CATEGORIA" and not campanha_in.categoria_alvo:
+        raise HTTPException(status_code=400, detail="Especifique a categoria alvo para o desconto.")
+    if campanha_in.tipo_aplicacao == "ITEM" and not campanha_in.item_alvo_id:
+        raise HTTPException(status_code=400, detail="Especifique o item alvo para o desconto.")
+
+    cupom_existente = db.query(Campanha).filter(Campanha.codigo == campanha_in.codigo.upper()).first()
+    if cupom_existente:
+        raise HTTPException(status_code=409, detail="Este código de cupom já existe.")
+
+    nova_campanha = Campanha(
+        codigo=campanha_in.codigo.upper(),
+        desconto_percentual=campanha_in.desconto_percentual,
+        tipo_aplicacao=campanha_in.tipo_aplicacao,
+        categoria_alvo=campanha_in.categoria_alvo,
+        item_alvo_id=campanha_in.item_alvo_id,
+        unidade_id=campanha_in.unidade_id,
+        ativo=True
+    )
+    db.add(nova_campanha)
+
+    # Rastreabilidade gerencial
+    escopo = f"Loja {nova_campanha.unidade_id}" if nova_campanha.unidade_id else "Rede Global"
+    registrar_auditoria(
+        db=db, 
+        usuario_id=usuario_atual.id, 
+        acao="CRIAR_CAMPANHA", 
+        detalhes=f"Cupom {nova_campanha.codigo} ({nova_campanha.desconto_percentual}%) criado para {escopo}."
+    )
+
+    db.commit()
+    db.refresh(nova_campanha)
+    return nova_campanha
+
+
+@app.get("/campanhas")
+def listar_campanhas(
+    db: Session = Depends(get_db),
+    usuario_atual: Usuario = Depends(verificar_tipo_usuario(["ADMIN", "GERENTE"]))
+):
+    from models import Campanha
+    query = db.query(Campanha)
+    
+    if usuario_atual.tipo == "GERENTE":
+        # Gerente enxerga todos os cupons (unidade null) e os cupons da sua propria loja
+        query = query.filter((Campanha.unidade_id == usuario_atual.unidade_id) | (Campanha.unidade_id.is_(None)))
+        
+    return query.all()

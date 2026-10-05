@@ -1,7 +1,16 @@
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from typing import List, Optional
 from datetime import date, datetime
 from models import CanalPedidoEnum
+
+
+class CampanhaCreate(BaseModel):
+    codigo: str
+    desconto_percentual: float
+    tipo_aplicacao: str # CATEGORIA ou ITEM
+    categoria_alvo: Optional[str] = None
+    item_alvo_id: Optional[int] = None
+    unidade_id: Optional[int] = None
 
 class UsuarioCreate(BaseModel):
     nome_completo: str
@@ -70,9 +79,20 @@ class ItemPedidoCreate(BaseModel):
 
 class PedidoCreate(BaseModel):
     unidade_id: int 
-    canal_pedido: CanalPedidoEnum
+    canal_pedido: str
     cpf_cliente: Optional[str] = None
     itens: List[ItemPedidoCreate]
+    
+    usar_pontos_fidelidade: bool = False
+    codigo_cupom: Optional[str] = None
+
+    @model_validator(mode='after')
+    def checar_exclusividade_beneficios(self):
+        if self.usar_pontos_fidelidade and self.codigo_cupom:
+            raise ValueError("Benefícios não cumulativos: Escolha usar pontos OU cupom.")
+        return self
+
+
 
 class ItemPedidoResponse(BaseModel):
     id: int
@@ -139,3 +159,7 @@ class LogAuditoriaResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class UsuarioComPedidosResponse(UsuarioResponse):
+    pedidos: List[PedidoResponse] = []
