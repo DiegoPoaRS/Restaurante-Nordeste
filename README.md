@@ -4,8 +4,10 @@ Backend em Python e FastAPI que simula sistema de restaurante
 
 1. Criar ambiente virtual Python 3.10.2:
    python -m venv venv
+   .\venv\Scripts\Activate
    
 3. Instalar requisitos:
+   python -m pip install --upgrade pip setuptools wheel
    pip install -r requirements.txt
    
 4. Rodar DB e API:
