@@ -10,8 +10,13 @@ Backend em Python e FastAPI que simula sistema de restaurante
    - python -m pip install --upgrade pip setuptools wheel
    - pip install -r requirements.txt
    
-4. Rodar DB e API:
+4. Rodar Aplicação:
    - uvicorn main:app --reload
    
 5. Acessar Documentação/Swagger:
    - http://127.0.0.1:8000/docs
+
+6. Para popular o banco de dados rode:
+   - python seed.py
+
+7. O banco de dados pode ser visualizado no DB Browser for SQLite
