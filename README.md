@@ -19,4 +19,6 @@ Backend em Python e FastAPI que simula sistema de restaurante
 6. Para popular o banco de dados rode:
    - python seed.py
 
-7. O banco de dados pode ser visualizado no DB Browser for SQLite
+7. O banco de dados pode ser visualizado no DB Browser for SQLite:
+https://sqlitebrowser.org/
+
