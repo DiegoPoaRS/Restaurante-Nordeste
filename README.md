@@ -1,8 +1,12 @@
 # Restaurante-Nordeste
-
 Backend em Python e FastAPI que simula sistema de restaurante
 
-1. Criar ambiente virtual Python 3.10.2:
+
+##REPRODUÇÃO:
+
+1. Fazer o clone do código (Download)
+
+2. Criar ambiente virtual Python 3.10.2:
    - python -m venv venv
    - .\venv\Scripts\Activate
    
@@ -20,5 +24,5 @@ Backend em Python e FastAPI que simula sistema de restaurante
    - python seed.py
 
 7. O banco de dados pode ser visualizado no DB Browser for SQLite:
-https://sqlitebrowser.org/
+   - https://sqlitebrowser.org/
 
