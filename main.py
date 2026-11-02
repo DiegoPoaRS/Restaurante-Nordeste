@@ -17,17 +17,19 @@ from schemas import UsuarioCreate, UsuarioResponse, ItemCardapioResponse, Pedido
 
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="API Raízes do Nordeste", version="1.1.0")
+app = FastAPI(title="API Raízes do Nordeste", version="1.1.14")
 
 @app.exception_handler(HTTPException)
 async def custom_http_exception_handler(request: Request, exc: HTTPException):
 
     error_name = "ERRO_DE_REQUISICAO"
-    if exc.status_code == 401: error_name = "CREDENCIAIS_INVALIDAS"
+    if exc.status_code == 400: error_name = "PROBLEMA COM A REQUISIÇÃO"
+    elif exc.status_code == 401: error_name = "CREDENCIAIS_INVALIDAS"
+    elif exc.status_code == 402: error_name = "PAGAMENTO_RECUSADO"    
     elif exc.status_code == 403: error_name = "ACESSO_NEGADO"
     elif exc.status_code == 404: error_name = "NAO_ENCONTRADO"
     elif exc.status_code == 409: error_name = "CONFLITO_REGRA_NEGOCIO"
-    elif exc.status_code == 402: error_name = "PAGAMENTO_RECUSADO"
+    elif exc.status_code == 422: error_name = "APENAS UMA PROMOÇÃO POR PEDIDO"
 
     return JSONResponse(
         status_code=exc.status_code,
@@ -93,8 +95,8 @@ def listar_logs_auditoria(
     db: Session = Depends(get_db),
     usuario_atual: Usuario = Depends(verificar_tipo_usuario(["ADMIN"])) # APENAS ADMIN PODE LER
 ):
-    """Retorna os últimos 100 registros de auditoria, ordenados do mais recente para o mais antigo."""
-    return db.query(LogAuditoria).order_by(LogAuditoria.data_hora.desc()).limit(100).all()
+
+    return db.query(LogAuditoria).order_by(LogAuditoria.data_hora.desc()).limit(10000).all()
 
 # --- ROTAS DE AUTENTICAÇÃO E USUÁRIOS ---
 
@@ -187,7 +189,7 @@ def promover_usuario(
         if usuario_alvo.tipo in ["ADMIN", "GERENTE"]:
             raise HTTPException(status_code=403, detail="Acesso negado: Você não pode alterar o cargo de Administradores ou de outros Gerentes.")
             
-        # Garante que o gerente só contrate para a própria loja onde trabalha
+        # gerente só contrata para própria loja onde trabalha
         if dados.novo_tipo == "FUNCIONARIO" and dados.unidade_id != usuario_logado.unidade_id:
             raise HTTPException(status_code=403, detail="Você só pode contratar funcionários para a sua própria unidade.")
 
@@ -226,17 +228,40 @@ def listar_unidades(db: Session = Depends(get_db)):
 #==============================
 
 @app.get("/cardapio", response_model=List[ItemCardapioResponse])
-def listar_cardapio(db: Session = Depends(get_db)):
-    return db.query(ItemCardapio).filter(ItemCardapio.disponivel == 1).all()
+def listar_cardapio(
+    unidade_id: Optional[int] = None,
+    db: Session = Depends(get_db)
+):
+    if unidade_id is not None:
+        unidade = db.query(Unidade).filter(Unidade.id == unidade_id).first()
+        if not unidade:
+            raise HTTPException(status_code=404, detail="Unidade não encontrada.")
 
-    
-@app.post("/cardapio", response_model=ItemCardapioResponse, status_code=status.HTTP_201_CREATED)
-def criar_item_cardapio(item: ItemCardapioCreate, db: Session = Depends(get_db), admin: dict = Depends(verificar_admin)):
-    novo_item = ItemCardapio(**item.model_dump(exclude_unset=True))
-    db.add(novo_item)
-    db.commit()
-    db.refresh(novo_item)
-    return novo_item
+        resultados = (
+            db.query(ItemCardapio, Estoque.quantidade)
+            .join(Estoque, Estoque.item_cardapio_id == ItemCardapio.id)
+            .filter(
+                ItemCardapio.disponivel == 1,
+                Estoque.unidade_id == unidade_id,
+                Estoque.quantidade > 0
+            )
+            .all()
+        )
+
+        return [
+            {
+                "id": item.id,
+                "nome": item.nome,
+                "descricao": item.descricao,
+                "preco": item.preco,
+                "categoria": item.categoria,
+                "disponivel": item.disponivel,
+                "quantidade_estoque": qtd
+            }
+            for item, qtd in resultados
+        ]
+
+    return db.query(ItemCardapio).filter(ItemCardapio.disponivel == 1).all()
 
 
 
@@ -361,16 +386,16 @@ def criar_pedido(
         if not cliente_final:
             raise HTTPException(status_code=400, detail="Identificação necessária para usar pontos.")
         
-        # 100 pontos = R$ 1.00
-        valor_em_pontos = cliente_final.pontos_fidelidade / 100.0
+        # 500 pontos = R$ 1.00
+        valor_em_pontos = round(cliente_final.pontos_fidelidade / 500.0, 2)
         if valor_em_pontos > 0:
             # Não deixa o desconto ser maior que o subtotal do pedido
             valor_desconto = min(subtotal_pedido, valor_em_pontos)
-            pontos_utilizados = int(valor_desconto * 100)
+            pontos_utilizados = int(valor_desconto * 500)
             cliente_final.pontos_fidelidade -= pontos_utilizados # Deduz os pontos do cliente real
 
     elif pedido_in.codigo_cupom:
-        from models import Campanha # Importe se necessário
+        from models import Campanha 
         cupom = db.query(Campanha).filter(
             Campanha.codigo == pedido_in.codigo_cupom,
             Campanha.ativo == True
@@ -664,7 +689,7 @@ def criar_campanha(
     )
     db.add(nova_campanha)
 
-    # Rastreabilidade gerencial
+    # Track do gerente
     escopo = f"Loja {nova_campanha.unidade_id}" if nova_campanha.unidade_id else "Rede Global"
     registrar_auditoria(
         db=db, 

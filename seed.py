@@ -148,7 +148,7 @@ def popular_banco():
         
         if estoque_criado > 0:
             db.commit()
-            print(f" {estoque_criado} registros de estoque inicializados (50 un. por item em cada loja).")
+            print(f" {estoque_criado} registros de estoque (50 itens por loja).")
 
         # ==========================================
         # CAMPANHAS PROMOCIONAIS
@@ -159,7 +159,7 @@ def popular_banco():
             {"codigo": "LANCHE15", "desconto_percentual": 15.0, "tipo_aplicacao": "CATEGORIA", "categoria_alvo": "LANCHES", "item_alvo_id": None, "ativo": True, "unidade_id": None},
             {"codigo": "BEBIDA10", "desconto_percentual": 10.0, "tipo_aplicacao": "CATEGORIA", "categoria_alvo": "BEBIDAS", "item_alvo_id": None, "ativo": True, "unidade_id": None},
             
-            # Desconto aplicado a um Item Específico (usando o ID do primeiro lanche criado: "O Cabra da Peste")
+            # aplica desconto item 1 loja 1
             {"codigo": "PROMO_CABRA", "desconto_percentual": 20.0, "tipo_aplicacao": "ITEM", "categoria_alvo": None, "item_alvo_id": itens_db[0].id, "ativo": True, "unidade_id": unidades_db["Matriz Raízes - Centro"].id}
         ]
 

@@ -56,7 +56,9 @@ class ItemCardapioResponse(BaseModel):
     nome: str
     descricao: Optional[str] = None
     preco: float
+    categoria: Optional[str] = None
     disponivel: int
+    quantidade_estoque: Optional[int] = None
 
     class Config:
         from_attributes = True
