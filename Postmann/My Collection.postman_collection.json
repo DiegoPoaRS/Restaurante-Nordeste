@@ -1,0 +1,581 @@
+{
+  "info": {
+    "_postman_id": "1843ed88-5338-4619-aa4f-5bef107b3370",
+    "name": "My Collection",
+    "description": "### Welcome to Postman! This is your first collection. \n\nCollections are your starting point for building and testing APIs. You can use this one to:\n\n• Group related requests\n• Test your API in real-world scenarios\n• Document and share your requests\n\nUpdate the name and overview whenever you’re ready to make it yours.\n\n[Learn more about Postman Collections.](https://learning.postman.com/docs/collections/collections-overview/)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "57392248",
+    "_collection_link": "https://go.postman.co/collection/57392248-1843ed88-5338-4619-aa4f-5bef107b3370?source=collection_link"
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "CT01 - Positivo - Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {\n    pm.response.to.have.status(200);\n});\n\nlet data;\npm.test(\"Response is valid JSON\", function () {\n    pm.expect(function () {\n        data = pm.response.json();\n    }).to.not.throw();\n});\n\npm.test(\"access_token is a non-empty string\", function () {\n    pm.expect(data).to.be.an(\"object\");\n    pm.expect(data.access_token).to.be.a(\"string\").and.not.be.empty;\n});\n\npm.test(\"token_type equals bearer\", function () {\n    pm.expect(data.token_type).to.eql(\"bearer\");\n});\n\npm.test(\"usuario_id is a positive integer\", function () {\n    pm.expect(data.usuario_id).to.be.a(\"number\");\n    pm.expect(Number.isInteger(data.usuario_id)).to.be.true;\n    pm.expect(data.usuario_id).to.be.above(0);\n});\n\npm.test(\"tipo equals CLIENTE\", function () {\n    pm.expect(data.tipo).to.eql(\"CLIENTE\");\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer"
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "username",
+                  "value": "jao@email.com"
+                },
+                {
+                  "key": "password",
+                  "value": "cliente123"
+                }
+              ]
+            },
+            "url": {
+              "raw": "http://127.0.0.1:8000/auth/login",
+              "protocol": "http",
+              "host": [
+                "127",
+                "0",
+                "0",
+                "1"
+              ],
+              "port": "8000",
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Login Cliente com sucesso"
+          },
+          "response": []
+        },
+        {
+          "name": "CT02 - Negativo - Auth",
+          "request": {
+            "auth": {
+              "type": "bearer"
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "username",
+                  "value": "ria@email.com"
+                },
+                {
+                  "key": "password",
+                  "value": "cilente213"
+                }
+              ]
+            },
+            "url": {
+              "raw": "http://127.0.0.1:8000/auth/login",
+              "protocol": "http",
+              "host": [
+                "127",
+                "0",
+                "0",
+                "1"
+              ],
+              "port": "8000",
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Login Cliente com senha errada"
+          },
+          "response": []
+        },
+        {
+          "name": "CT03 - Negativo - Acesso sem permissao",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{json_web_token_07mx}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n  \"item_cardapio_id\": 3,\r\n  \"quantidade\": 150,\r\n  \"unidade_id\": 1\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "http://127.0.0.1:8000/estoque",
+              "protocol": "http",
+              "host": [
+                "127",
+                "0",
+                "0",
+                "1"
+              ],
+              "port": "8000",
+              "path": [
+                "estoque"
+              ],
+              "query": [
+                {
+                  "key": "",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "CT04 - Positivo - Login do admin",
+          "request": {
+            "auth": {
+              "type": "bearer"
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "username",
+                  "value": "admin@raizes.com.br"
+                },
+                {
+                  "key": "password",
+                  "value": "admin123"
+                }
+              ]
+            },
+            "url": {
+              "raw": "http://127.0.0.1:8000/auth/login",
+              "protocol": "http",
+              "host": [
+                "127",
+                "0",
+                "0",
+                "1"
+              ],
+              "port": "8000",
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Login admin com sucesso"
+          },
+          "response": []
+        },
+        {
+          "name": "CT12 - Positivo - Cadastro Cliente",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 400\", function () {\n    pm.response.to.have.status(400);\n});\n\npm.test(\"Content-Type is JSON when provided\", function () {\n    const contentType = pm.response.headers.get(\"Content-Type\");\n    if (contentType) {\n        pm.expect(contentType.toLowerCase()).to.include(\"application/json\");\n    }\n});\n\nlet responseJson;\npm.test(\"Response body is valid JSON\", function () {\n    pm.expect(function () {\n        responseJson = pm.response.json();\n    }).not.to.throw();\n});\n\npm.test(\"Response contains the expected LGPD validation error\", function () {\n    responseJson = responseJson || pm.response.json();\n    pm.expect(responseJson.error).to.eql(\"ERRO_DE_REQUISICAO\");\n    pm.expect(responseJson.message).to.eql(\"O aceite da LGPD é obrigatório para cadastro.\");\n    pm.expect(responseJson.path).to.eql(\"/auth/registro\");\n});\n\npm.test(\"Details is an empty array\", function () {\n    responseJson = responseJson || pm.response.json();\n    pm.expect(responseJson.details).to.be.an(\"array\").that.is.empty;\n});\n\npm.test(\"Timestamp is present and valid\", function () {\n    responseJson = responseJson || pm.response.json();\n    pm.expect(responseJson).to.have.property(\"timestamp\");\n    pm.expect(responseJson.timestamp).to.be.a(\"string\").and.not.empty;\n    pm.expect(Date.parse(responseJson.timestamp)).to.not.be.NaN;\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"nome_completo\": \"Joaobolão Silveira\",\n    \"email\": \"joao.silva.teste@email.com\",\n    \"senha\": \"senhaforte123\",\n    \"endereco_entrega\": \"Rua Principal, 1123\",\n    \"telefone\": \"844559999999\",\n    \"cpf\": \"11133233344\",\n    \"data_nascimento\": \"1990-05-20\",\n    \"aceite_lgpd\": \"false\",\n    \"tipo\": \"CLIENTE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "http://127.0.0.1:8000/auth/registro",
+              "protocol": "http",
+              "host": [
+                "127",
+                "0",
+                "0",
+                "1"
+              ],
+              "port": "8000",
+              "path": [
+                "auth",
+                "registro"
+              ]
+            },
+            "description": "Cadastro cliente com falha. aceite lgpd falso"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Validacao",
+      "item": [
+        {
+          "name": "CT05 - Negativo - Campo ausente",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Successful POST request\", function () {\n    pm.expect(pm.response.code).to.be.oneOf([200, 201]);\n});\n\npm.test(\"Response is valid JSON\", function () {\n    pm.expect(() => pm.response.json()).not.to.throw();\n});\n\npm.test(\"Response data matches the submitted client\", function () {\n    const responseData = pm.response.json();\n    let requestData;\n\n    pm.expect(pm.request.body, \"Request body is present\").to.exist;\n    pm.expect(pm.request.body.mode, \"Request body uses raw JSON\").to.eql(\"raw\");\n    pm.expect(() => {\n        requestData = JSON.parse(pm.variables.replaceIn(pm.request.body.raw));\n    }, \"Submitted request body is valid JSON\").not.to.throw();\n\n    pm.expect(responseData.id, \"id\").to.be.a(\"number\").and.to.be.above(0);\n    pm.expect(responseData.nome_completo, \"nome_completo\").to.eql(requestData.nome_completo);\n    pm.expect(responseData.email, \"email\").to.eql(requestData.email);\n    pm.expect(responseData.cpf, \"cpf\").to.eql(requestData.cpf);\n    pm.expect(responseData.tipo, \"tipo\").to.eql(requestData.tipo);\n    pm.expect(responseData.pontos_fidelidade, \"pontos_fidelidade\").to.eql(0);\n    pm.expect(responseData.unidade_id, \"unidade_id\").to.be.null;\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"nome_completo\": \"João Silva\",\n    \"email\": \"joao.silva.postman.0411@email.com\",\n    \"senha\": \"senhaforte123\",\n    \"endereco_entrega\": \"Rua Principal, 123\",\n    \"telefone\": \"84999999999\",\n    \"cpf\": \"52998224725\",\n    \"data_nascimento\": \"1990-05-20\",\n    \"aceite_lgpd\": true,\n    \"tipo\": \"CLIENTE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "http://127.0.0.1:8000/auth/registro",
+              "protocol": "http",
+              "host": [
+                "127",
+                "0",
+                "0",
+                "1"
+              ],
+              "port": "8000",
+              "path": [
+                "auth",
+                "registro"
+              ]
+            },
+            "description": "Cadastro cliente com sucesso"
+          },
+          "response": []
+        },
+        {
+          "name": "CT06 - Negativo - Tipo Invalido",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Successful POST request\", function () {\n    pm.expect(pm.response.code).to.be.oneOf([200, 201]);\n});\n\npm.test(\"Response is valid JSON\", function () {\n    pm.expect(() => pm.response.json()).not.to.throw();\n});\n\npm.test(\"Response data matches the submitted client\", function () {\n    const responseData = pm.response.json();\n    let requestData;\n\n    pm.expect(pm.request.body, \"Request body is present\").to.exist;\n    pm.expect(pm.request.body.mode, \"Request body uses raw JSON\").to.eql(\"raw\");\n    pm.expect(() => {\n        requestData = JSON.parse(pm.variables.replaceIn(pm.request.body.raw));\n    }, \"Submitted request body is valid JSON\").not.to.throw();\n\n    pm.expect(responseData.id, \"id\").to.be.a(\"number\").and.to.be.above(0);\n    pm.expect(responseData.nome_completo, \"nome_completo\").to.eql(requestData.nome_completo);\n    pm.expect(responseData.email, \"email\").to.eql(requestData.email);\n    pm.expect(responseData.cpf, \"cpf\").to.eql(requestData.cpf);\n    pm.expect(responseData.tipo, \"tipo\").to.eql(requestData.tipo);\n    pm.expect(responseData.pontos_fidelidade, \"pontos_fidelidade\").to.eql(0);\n    pm.expect(responseData.unidade_id, \"unidade_id\").to.be.null;\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"nome_completo\": \"João Silva\",\n    \"email\": \"joao.silva.postman.0411@email.com\",\n    \"senha\": \"senhaforte123\",\n    \"endereco_entrega\": \"Rua Principal, 123\",\n    \"telefone\": \"84999999999\",\n    \"cpf\": \"52998224725\",\n    \"data_nascimento\": \"1990-05-20\",\n    \"aceite_lgpd\": true,\n    \"tipo\": \"CLIENTE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "http://127.0.0.1:8000/auth/registro",
+              "protocol": "http",
+              "host": [
+                "127",
+                "0",
+                "0",
+                "1"
+              ],
+              "port": "8000",
+              "path": [
+                "auth",
+                "registro"
+              ]
+            },
+            "description": "Cadastro cliente com sucesso"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Regras",
+      "item": [
+        {
+          "name": "CT07 - Positivo - Pedido Realizado",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Successful POST request\", function () {\n    pm.expect(pm.response.code).to.be.oneOf([200, 201]);\n});\n\npm.test(\"Response is valid JSON\", function () {\n    pm.expect(() => pm.response.json()).not.to.throw();\n});\n\npm.test(\"Response data matches the submitted client\", function () {\n    const responseData = pm.response.json();\n    let requestData;\n\n    pm.expect(pm.request.body, \"Request body is present\").to.exist;\n    pm.expect(pm.request.body.mode, \"Request body uses raw JSON\").to.eql(\"raw\");\n    pm.expect(() => {\n        requestData = JSON.parse(pm.variables.replaceIn(pm.request.body.raw));\n    }, \"Submitted request body is valid JSON\").not.to.throw();\n\n    pm.expect(responseData.id, \"id\").to.be.a(\"number\").and.to.be.above(0);\n    pm.expect(responseData.nome_completo, \"nome_completo\").to.eql(requestData.nome_completo);\n    pm.expect(responseData.email, \"email\").to.eql(requestData.email);\n    pm.expect(responseData.cpf, \"cpf\").to.eql(requestData.cpf);\n    pm.expect(responseData.tipo, \"tipo\").to.eql(requestData.tipo);\n    pm.expect(responseData.pontos_fidelidade, \"pontos_fidelidade\").to.eql(0);\n    pm.expect(responseData.unidade_id, \"unidade_id\").to.be.null;\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"nome_completo\": \"João Silva\",\n    \"email\": \"joao.silva.postman.0411@email.com\",\n    \"senha\": \"senhaforte123\",\n    \"endereco_entrega\": \"Rua Principal, 123\",\n    \"telefone\": \"84999999999\",\n    \"cpf\": \"52998224725\",\n    \"data_nascimento\": \"1990-05-20\",\n    \"aceite_lgpd\": true,\n    \"tipo\": \"CLIENTE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "http://127.0.0.1:8000/auth/registro",
+              "protocol": "http",
+              "host": [
+                "127",
+                "0",
+                "0",
+                "1"
+              ],
+              "port": "8000",
+              "path": [
+                "auth",
+                "registro"
+              ]
+            },
+            "description": "Cadastro cliente com sucesso"
+          },
+          "response": []
+        },
+        {
+          "name": "CT08 - Negativo - Pedido unidade não existente",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Successful POST request\", function () {\n    pm.expect(pm.response.code).to.be.oneOf([200, 201]);\n});\n\npm.test(\"Response is valid JSON\", function () {\n    pm.expect(() => pm.response.json()).not.to.throw();\n});\n\npm.test(\"Response data matches the submitted client\", function () {\n    const responseData = pm.response.json();\n    let requestData;\n\n    pm.expect(pm.request.body, \"Request body is present\").to.exist;\n    pm.expect(pm.request.body.mode, \"Request body uses raw JSON\").to.eql(\"raw\");\n    pm.expect(() => {\n        requestData = JSON.parse(pm.variables.replaceIn(pm.request.body.raw));\n    }, \"Submitted request body is valid JSON\").not.to.throw();\n\n    pm.expect(responseData.id, \"id\").to.be.a(\"number\").and.to.be.above(0);\n    pm.expect(responseData.nome_completo, \"nome_completo\").to.eql(requestData.nome_completo);\n    pm.expect(responseData.email, \"email\").to.eql(requestData.email);\n    pm.expect(responseData.cpf, \"cpf\").to.eql(requestData.cpf);\n    pm.expect(responseData.tipo, \"tipo\").to.eql(requestData.tipo);\n    pm.expect(responseData.pontos_fidelidade, \"pontos_fidelidade\").to.eql(0);\n    pm.expect(responseData.unidade_id, \"unidade_id\").to.be.null;\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"nome_completo\": \"João Silva\",\n    \"email\": \"joao.silva.postman.0411@email.com\",\n    \"senha\": \"senhaforte123\",\n    \"endereco_entrega\": \"Rua Principal, 123\",\n    \"telefone\": \"84999999999\",\n    \"cpf\": \"52998224725\",\n    \"data_nascimento\": \"1990-05-20\",\n    \"aceite_lgpd\": true,\n    \"tipo\": \"CLIENTE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "http://127.0.0.1:8000/auth/registro",
+              "protocol": "http",
+              "host": [
+                "127",
+                "0",
+                "0",
+                "1"
+              ],
+              "port": "8000",
+              "path": [
+                "auth",
+                "registro"
+              ]
+            },
+            "description": "Cadastro cliente com sucesso"
+          },
+          "response": []
+        },
+        {
+          "name": "CT09 - Negativo - Pedido insuficiente Copy",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Successful POST request\", function () {\n    pm.expect(pm.response.code).to.be.oneOf([200, 201]);\n});\n\npm.test(\"Response is valid JSON\", function () {\n    pm.expect(() => pm.response.json()).not.to.throw();\n});\n\npm.test(\"Response data matches the submitted client\", function () {\n    const responseData = pm.response.json();\n    let requestData;\n\n    pm.expect(pm.request.body, \"Request body is present\").to.exist;\n    pm.expect(pm.request.body.mode, \"Request body uses raw JSON\").to.eql(\"raw\");\n    pm.expect(() => {\n        requestData = JSON.parse(pm.variables.replaceIn(pm.request.body.raw));\n    }, \"Submitted request body is valid JSON\").not.to.throw();\n\n    pm.expect(responseData.id, \"id\").to.be.a(\"number\").and.to.be.above(0);\n    pm.expect(responseData.nome_completo, \"nome_completo\").to.eql(requestData.nome_completo);\n    pm.expect(responseData.email, \"email\").to.eql(requestData.email);\n    pm.expect(responseData.cpf, \"cpf\").to.eql(requestData.cpf);\n    pm.expect(responseData.tipo, \"tipo\").to.eql(requestData.tipo);\n    pm.expect(responseData.pontos_fidelidade, \"pontos_fidelidade\").to.eql(0);\n    pm.expect(responseData.unidade_id, \"unidade_id\").to.be.null;\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"nome_completo\": \"João Silva\",\n    \"email\": \"joao.silva.postman.0411@email.com\",\n    \"senha\": \"senhaforte123\",\n    \"endereco_entrega\": \"Rua Principal, 123\",\n    \"telefone\": \"84999999999\",\n    \"cpf\": \"52998224725\",\n    \"data_nascimento\": \"1990-05-20\",\n    \"aceite_lgpd\": true,\n    \"tipo\": \"CLIENTE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "http://127.0.0.1:8000/auth/registro",
+              "protocol": "http",
+              "host": [
+                "127",
+                "0",
+                "0",
+                "1"
+              ],
+              "port": "8000",
+              "path": [
+                "auth",
+                "registro"
+              ]
+            },
+            "description": "Cadastro cliente com sucesso"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Pagamento Status",
+      "item": [
+        {
+          "name": "CT10 - Positivo - Pagamento de Pedido",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": ""
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "CT11 - Positivo - Funcionario Lista pedidos",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{token_gerente}}.",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://127.0.0.1:8000/pedidos",
+          "protocol": "http",
+          "host": [
+            "127",
+            "0",
+            "0",
+            "1"
+          ],
+          "port": "8000",
+          "path": [
+            "pedidos"
+          ]
+        },
+        "description": "Usar bearer de login do gerente."
+      },
+      "response": []
+    },
+    {
+      "name": "CT13 - Positivo - Funcionario Atualiza Estoque",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{token_admin}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "PUT",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\r\n  \"item_cardapio_id\": 3,\r\n  \"quantidade\": 150,\r\n  \"unidade_id\": 1\r\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "http://127.0.0.1:8000/estoque",
+          "protocol": "http",
+          "host": [
+            "127",
+            "0",
+            "0",
+            "1"
+          ],
+          "port": "8000",
+          "path": [
+            "estoque"
+          ],
+          "query": [
+            {
+              "key": "",
+              "value": "",
+              "disabled": true
+            }
+          ]
+        }
+      },
+      "response": []
+    }
+  ],
+  "variable": [
+    {
+      "key": "token_gerente",
+      "value": ""
+    },
+    {
+      "key": "token_admin",
+      "value": ""
+    },
+    {
+      "key": "token_cliente_jao",
+      "value": ""
+    }
+  ]
+}
