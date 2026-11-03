@@ -1,6 +1,6 @@
-# Restaurante-Nordeste
-Backend em Python e FastAPI que simula sistema de restaurante
+# Restaurante-Raizes-do-Nordeste
 
+Projeto de Backend em Python, FastAPI e SQLAlchemy que simula sistema de restaurante
 
 ##REPRODUÇÃO:
 
@@ -29,3 +29,4 @@ Backend em Python e FastAPI que simula sistema de restaurante
 9. O banco de dados pode ser visualizado no DB Browser for SQLite (necessita instalação):
    - https://sqlitebrowser.org/
 
+Desenvolvido por Diego C Avila RU 2049765
